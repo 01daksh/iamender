@@ -1,0 +1,15 @@
+services:
+  localstack:
+    container_name: iamender-localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: iam,s3,lambda,sts
+      DEFAULT_REGION: us-east-1
+      ENFORCE_IAM: "1"
+      LS_LOG: warn
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./.localstack-artifacts:/var/lib/iamender-artifacts:ro"

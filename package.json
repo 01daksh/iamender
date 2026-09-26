@@ -1,0 +1,45 @@
+{
+  "name": "iamender",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "agent": "tsx agent/cli.ts",
+    "agent:server": "tsx agent/server.ts",
+    "mcp:server": "tsx agent/mcp-server.ts",
+    "trueforge:setup": "tsx agent/trueforge-setup.ts",
+    "agent:check": "tsc -p agent/tsconfig.json",
+    "localstack:check": "tsc -p localstack/tsconfig.json",
+    "localstack:up": "docker compose -f docker-compose.localstack.yml up -d",
+    "localstack:down": "docker compose -f docker-compose.localstack.yml down",
+    "package:local-lambda": "mkdir -p .localstack-artifacts && zip -jq .localstack-artifacts/iamender-report-lambda.zip localstack/report-lambda/index.mjs",
+    "seed:local": "npm run package:local-lambda && tsx localstack/seed.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-accessanalyzer": "latest",
+    "@aws-sdk/client-cloudtrail": "latest",
+    "@aws-sdk/client-iam": "latest",
+    "@aws-sdk/client-lambda": "latest",
+    "@aws-sdk/client-s3": "latest",
+    "@aws-sdk/client-sts": "latest",
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "@vitejs/plugin-react": "latest",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "react": "latest",
+    "react-dom": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}

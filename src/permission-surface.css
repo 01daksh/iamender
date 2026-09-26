@@ -1,0 +1,11 @@
+/* The historical graph used `.removed`; isolate the chart row from that global rule. */
+.permission-surface .surface-row.removed {
+  position: static;
+  left: auto;
+  top: auto;
+  width: auto;
+  height: auto;
+  display: grid;
+  background: transparent;
+  transform: none;
+}
