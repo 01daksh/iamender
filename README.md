@@ -162,16 +162,6 @@ npm run agent:check
 npm run build
 ```
 
-## What judges should look for
-
-- The agent reaches a real external system: LocalStack IAM/Lambda today, AWS IAM/Lambda in production.
-- The UI demonstrates informed review, not a policy dump.
-- A weak-evidence finding is intentionally refused.
-- A scoped S3 rewrite is validated, simulated, human-approved in TrueForge, versioned, and verified.
-- The final UI re-reads the current policy and shows the amendment as active.
-
-See [DEMO_SCRIPT.md](DEMO_SCRIPT.md) for a 6–8 minute presentation flow and technical Q&A notes.
-
 ## Production extension
 
 The demo scope is intentionally one account and seeded identities. The next step is to enrich evidence before widening autonomous scope:
