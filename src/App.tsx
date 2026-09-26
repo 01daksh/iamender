@@ -12,6 +12,7 @@ type Review = {
   localLimitations: string[];
 };
 type ApiResponse = { reviews: Review[]; generatedAt: string; mode: string };
+type Readiness = { localstack: { ready: boolean }; tools: { ready: boolean; writeEnabled: boolean }; trueforge: { ready: boolean; mcp?: { ready: boolean }; error?: string } };
 type ApprovalState = "pending_human_review" | "dry_run_verified" | "rejected";
 type Approval = { findingId: string; state: ApprovalState; writeBlocked: true; events: { at: string; label: string; detail: string }[]; validation?: unknown; simulation?: unknown; verification?: unknown };
 const severityClass: Record<Severity, string> = { Critical: "critical", High: "high", Medium: "medium" };
@@ -48,6 +49,11 @@ function AppliedAmendment({ review, onOpenTrace }: { review: Review; onOpenTrace
   return <section className="approval-panel applied-amendment"><div className="approval-panel-head"><div><p className="label">APPROVED AMENDMENT</p><h3>Human approval applied.</h3><p>IAMender has re-read the live IAM policy and confirmed that the scoped least-privilege permissions are now active.</p></div><span className="approval-state">policy active</span></div><div className="verification-grid"><span><b>Human gate</b>Approved in TrueForge</span><span><b>Live policy</b>{review.policyDelta.current.length} scoped permissions active</span><span><b>Rollback</b>Previous version retained</span></div><div className="approval-actions"><button type="button" onClick={onOpenTrace}>Open approval trace ↗</button><small>Any rollback requires a separate human approval.</small></div></section>;
 }
 
+function ServiceReadiness({ readiness, checking, onCheck }: { readiness: Readiness | null; checking: boolean; onCheck: () => void }) {
+  const item = (label: string, ready: boolean | undefined) => <span className={ready ? "service-ready" : "service-waiting"}><b>{ready ? "●" : "○"}</b>{label}</span>;
+  return <div className="service-readiness"><div>{item("LocalStack", readiness?.localstack.ready)}{item("IAMender tools", readiness?.tools.ready)}{item("TrueForge", readiness?.trueforge.ready)}</div><button type="button" onClick={onCheck} disabled={checking}>{checking ? "Checking…" : "Check services"}</button></div>;
+}
+
 export default function App() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -57,6 +63,8 @@ export default function App() {
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const [approval, setApproval] = useState<Approval | null>(null);
   const [approvalBusy, setApprovalBusy] = useState(false);
+  const [readiness, setReadiness] = useState<Readiness | null>(null);
+  const [checkingReadiness, setCheckingReadiness] = useState(false);
   const trueForgeUrl = import.meta.env.VITE_TRUEFORGE_URL || "http://localhost:8790";
   const refresh = async () => {
     setRefreshing(true); setError(null);
@@ -69,6 +77,15 @@ export default function App() {
     finally { setRefreshing(false); }
   };
   useEffect(() => { void refresh(); }, []);
+  const checkReadiness = async () => {
+    setCheckingReadiness(true);
+    try {
+      const response = await fetch("/api/readiness", { cache: "no-store" });
+      setReadiness(await response.json() as Readiness);
+    } catch { setReadiness(null); }
+    finally { setCheckingReadiness(false); }
+  };
+  useEffect(() => { void checkReadiness(); }, []);
   const selected = useMemo(() => data?.reviews.find((review) => review.id === selectedId) ?? data?.reviews[0], [data, selectedId]);
   useEffect(() => {
     if (!selected) return;
@@ -108,7 +125,7 @@ export default function App() {
   if (!selected) return <main className="data-state"><p className="label">IAMENDER LIVE REVIEW</p><h1>{error ? "The agent needs attention." : "Scanning local access…"}</h1><p>{error ?? "Reading IAM policies, Lambda workload evidence, and policy recommendations."}</p><button type="button" onClick={() => void refresh()}>{error ? "Retry live scan" : "Refresh"}</button></main>;
   return <main>
     <header className="app-header"><a className="wordmark" href="#top">IAMender<span>®</span></a><nav><a href="#findings">Findings</a><a href="#review">Review</a></nav><button className="trace-link" type="button" onClick={openTrace}>Open TrueForge trace ↗</button></header>
-    <section id="top" className="hero-grid"><div className="hero-copy"><p className="label">IAM SAFETY REVIEW · {data?.mode.toUpperCase()}</p><h1>Make access<br /><em>make sense.</em></h1><p>IAMender turns risky permissions into a visible, evidence-backed decision—before anything changes in IAM.</p><button type="button" onClick={() => document.getElementById("findings")?.scrollIntoView({ behavior: "smooth" })}>Explore findings <span>↓</span></button></div><div className="hero-board"><span className="label">LIVE ACCOUNT REVIEW</span><div className="scan-count"><strong>{data?.reviews.length}</strong><span>live identities<br />need attention</span></div><div className="scan-steps"><p className="complete"><b>✓</b> IAM policies retrieved</p><p className="complete"><b>✓</b> Risk and spend authority ranked</p><p className="complete"><b>✓</b> Least-privilege plan generated</p><p className={ready ? "in-progress" : "complete"}><b>{ready ? "↻" : "✓"}</b> {ready ? "Human approval pending" : applied ? "Human-approved amendment active" : "No approval run pending"}</p></div><button className="hero-chip refresh-chip" type="button" onClick={() => void refresh()}>{refreshing ? "REFRESHING…" : "REFRESH LIVE DATA"}</button></div></section>
+    <section id="top" className="hero-grid"><div className="hero-copy"><p className="label">IAM SAFETY REVIEW · {data?.mode.toUpperCase()}</p><h1>Make access<br /><em>make sense.</em></h1><p>IAMender turns risky permissions into a visible, evidence-backed decision—before anything changes in IAM.</p><button type="button" onClick={() => document.getElementById("findings")?.scrollIntoView({ behavior: "smooth" })}>Explore findings <span>↓</span></button></div><div className="hero-board"><span className="label">LIVE ACCOUNT REVIEW</span><div className="scan-count"><strong>{data?.reviews.length}</strong><span>live identities<br />need attention</span></div><div className="scan-steps"><p className="complete"><b>✓</b> IAM policies retrieved</p><p className="complete"><b>✓</b> Risk and spend authority ranked</p><p className="complete"><b>✓</b> Least-privilege plan generated</p><p className={ready ? "in-progress" : "complete"}><b>{ready ? "↻" : "✓"}</b> {ready ? "Human approval pending" : applied ? "Human-approved amendment active" : "No approval run pending"}</p></div><ServiceReadiness readiness={readiness} checking={checkingReadiness} onCheck={() => void checkReadiness()} /><button className="hero-chip refresh-chip" type="button" onClick={() => { void refresh(); void checkReadiness(); }}>{refreshing ? "REFRESHING…" : "REFRESH LIVE DATA"}</button></div></section>
     <section className="summary-grid" aria-label="Live review summary"><article><span className="summary-number">{String(critical).padStart(2, "0")}</span><h2>Critical<br />permission</h2><p>Live count of administrator-like authority requiring evidence before change.</p></article><article><span className="summary-number">{String(high).padStart(2, "0")}</span><h2>High risk<br />findings</h2><p>Live wildcard and over-privileged identities needing attention.</p></article><article className="summary-ready"><span className="summary-number">{String(applied).padStart(2, "0")}</span><h2>Amendments<br />active</h2><p>Human-approved least-privilege policy versions currently in effect.</p></article></section>
     <section id="findings" className="review-layout"><aside className="finding-rail"><div className="section-title"><p className="label">PRIORITY QUEUE</p><h2>Find what<br />matters.</h2></div>{data?.reviews.map((review) => <button key={review.id} type="button" className={`finding-card ${selected.id === review.id ? "selected" : ""}`} onClick={() => setSelectedId(review.id)}><span className={`severity ${severityClass[review.severity]}`}>{review.severity}</span><strong>{review.identity}</strong><small>{review.title}</small><i>→</i></button>)}</aside>
       <section id="review" className="review-pane" aria-live="polite"><div className="review-top"><div><p className="label">IAMENDER INVESTIGATION</p><h2>{selected.identity}</h2><p>{selected.summary}</p></div><span className={`status ${selected.status === "ready_for_approval" || selected.status === "amendment_applied" ? "ready" : "watch"}`}>{statusLabel[selected.status]}</span></div><div className="risk-grid"><section className="risk-chart"><div className="chart-title"><p className="label">EVIDENCE PROFILE</p><span>Live 0—100</span></div><Meter label="Security risk" value={selected.scores.securityRisk} /><Meter label="Spend authority" value={selected.scores.spendAuthority} /><Meter label="Evidence confidence" value={selected.scores.evidenceConfidence} /></section><section className="policy-delta"><p className="label">POLICY DELTA</p><div><span>Granted now</span><b>{selected.policyDelta.current.join(" · ") || "No policy entries"}</b></div><div><span>Keep</span><b>{selected.policyDelta.retain.join(" · ") || "No safe rewrite yet"}</b></div><div><span>Remove</span><b>{selected.policyDelta.remove.join(" · ") || "No policy change proposed"}</b></div></section></div>
@@ -118,7 +135,7 @@ export default function App() {
         {selected.status === "ready_for_approval" && <ApprovalPanel approval={approval} busy={approvalBusy} onRequest={() => void updateApproval("/api/approvals")} onDecision={(action) => void updateApproval(`/api/approvals/${encodeURIComponent(selected.id)}/decision`, { action })} />}
         {selected.status === "amendment_applied" && <AppliedAmendment review={selected} onOpenTrace={openTrace} />}
         {selected.localLimitations.length > 0 && <p className="local-note">Local mode: {selected.localLimitations.join(" ")}</p>}
-        <footer className="approval-bar"><div><p className="label">APPROVAL BOUNDARY</p><strong>{selected.status === "amendment_applied" ? "Approved least-privilege policy is active" : selected.status === "ready_for_approval" ? "Ready to request a policy-version change" : "More evidence is required before any change"}</strong><span>{approvalError ?? selected.blastRadius.rollback}</span></div><button type="button" disabled={openingApproval} onClick={() => void startApprovalReview()}>{openingApproval ? "Opening review…" : selected.status === "ready_for_approval" ? "Review approval run ↗" : "Open full trace ↗"}</button></footer>
+        <footer className="approval-bar"><div><p className="label">APPROVAL BOUNDARY</p><strong>{selected.status === "amendment_applied" ? "Approved least-privilege policy is active" : selected.status === "ready_for_approval" ? "Ready to request a policy-version change" : "More evidence is required before any change"}</strong><span>{approvalError ?? selected.blastRadius.rollback}</span></div><button type="button" disabled={openingApproval || selected.status === "ready_for_approval" && readiness !== null && !readiness.trueforge.ready} onClick={() => void startApprovalReview()}>{openingApproval ? "Opening review…" : selected.status === "ready_for_approval" && readiness !== null && !readiness.trueforge.ready ? "Check services above" : selected.status === "ready_for_approval" ? "Review approval run ↗" : "Open full trace ↗"}</button></footer>
       </section></section>
   </main>;
 }

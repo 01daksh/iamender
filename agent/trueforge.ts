@@ -5,6 +5,17 @@ const baseUrl = (process.env.IAMENDER_TRUEFORGE_URL ?? "http://localhost:8790").
 const model = process.env.IAMENDER_TRUEFORGE_MODEL;
 const mcpUrl = process.env.IAMENDER_MCP_URL ?? "http://127.0.0.1:8788/mcp";
 
+export async function iamenderToolsStatus() {
+  const healthUrl = new URL("/health", mcpUrl);
+  try {
+    const response = await fetch(healthUrl, { signal: AbortSignal.timeout(2_500) });
+    const body = await response.json() as { ok?: boolean; writeEnabled?: boolean };
+    return { ready: response.ok && body.ok === true, writeEnabled: body.writeEnabled === true };
+  } catch {
+    return { ready: false, writeEnabled: false };
+  }
+}
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(`${baseUrl}${path}`, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
   const body = await response.json() as { data?: unknown; error?: { message?: string } };
@@ -14,7 +25,8 @@ async function api(path: string, init?: RequestInit) {
 
 export async function trueForgeStatus() {
   const models = await api("/api/v1/models") as { data: { name: string }[] };
-  return { url: baseUrl, configuredModel: model ?? null, availableModels: models.data.map((item) => item.name), ready: Boolean(model && models.data.some((item) => item.name === model)) };
+  const mcp = await iamenderToolsStatus();
+  return { url: baseUrl, configuredModel: model ?? null, availableModels: models.data.map((item) => item.name), mcp, ready: Boolean(model && models.data.some((item) => item.name === model) && mcp.ready) };
 }
 
 export async function ensureIamenderAgent() {
@@ -32,6 +44,8 @@ export async function ensureIamenderAgent() {
 }
 
 export async function createApprovalSession(review: ReviewCase) {
+  const tools = await iamenderToolsStatus();
+  if (!tools.ready) throw new Error("IAMender tools are offline. Start `npm run agent:server`, wait for the Tool service status to turn ready, then retry.");
   await ensureIamenderAgent();
   const session = await api("/api/v1/sessions", { method: "POST", body: JSON.stringify({ agent: { name: "iamender" }, metadata: { iamenderFinding: review.id, mode: "approval-review" } }) }) as { data: { id: string } };
   await api(`/api/v1/sessions/${session.data.id}/turns`, { method: "POST", body: JSON.stringify({ stream: false, previous_turn_id: "none", input: [{ type: "user.message", content: `Review ${review.identity}. Use analyze_findings, then explain the evidence, proposed policy, blast radius, simulation plan, and rollback plan. Do not apply or roll back any policy.` }] }) });

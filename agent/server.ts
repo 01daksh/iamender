@@ -2,10 +2,14 @@ import { createServer } from "node:http";
 import { AwsIamender } from "./aws.js";
 import { loadConfig } from "./config.js";
 import { analyzeAccount } from "./review.js";
-import { createApprovalSession, trueForgeStatus } from "./trueforge.js";
+import { createApprovalSession, iamenderToolsStatus, trueForgeStatus } from "./trueforge.js";
 import { decideApproval, getApproval, requestApproval } from "./approval.js";
+import { startMcpServer } from "./mcp-server.js";
 
 const port = Number(process.env.IAMENDER_API_PORT ?? 8787);
+
+// A judge should never need to remember a second hidden process for agent tools.
+startMcpServer();
 
 function sendJson(response: import("node:http").ServerResponse, status: number, body: unknown) {
   response.writeHead(status, {
@@ -28,6 +32,17 @@ createServer(async (request, response) => {
   if (request.method === "GET" && path === "/api/health") {
     const config = loadConfig();
     sendJson(response, 200, { ok: true, mode: config.localMode ? "localstack" : "aws" });
+    return;
+  }
+  if (request.method === "GET" && path === "/api/readiness") {
+    const config = loadConfig();
+    const aws = new AwsIamender(config);
+    const [localstack, trueforge, tools] = await Promise.all([
+      aws.identity().then(() => ({ ready: true })).catch(() => ({ ready: false })),
+      trueForgeStatus().catch((error) => ({ ready: false, error: error instanceof Error ? error.message : "TrueForge is unavailable." })),
+      iamenderToolsStatus(),
+    ]);
+    sendJson(response, 200, { localstack, trueforge, tools });
     return;
   }
   if (request.method === "GET" && path === "/api/reviews") {

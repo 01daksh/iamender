@@ -9,3 +9,5 @@
   background: transparent;
   transform: none;
 }
+
+.service-readiness{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;padding-top:13px;border-top:1px solid #fff9e94d;font:500 9px/1.2 'DM Mono',monospace}.service-readiness>div{display:flex;gap:9px;flex-wrap:wrap}.service-readiness span{white-space:nowrap}.service-readiness b{margin-right:4px}.service-ready{color:var(--lime)}.service-waiting{color:#fff9e9a6}.service-readiness button{border:1px solid #fff9e98c;border-radius:100px;padding:5px 7px;background:transparent;color:var(--cream);font:500 8px 'DM Mono',monospace;text-transform:uppercase}.service-readiness button:disabled{opacity:.6}@media(max-width:800px){.service-readiness{align-items:flex-start;flex-direction:column}}

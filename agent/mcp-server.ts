@@ -49,6 +49,10 @@ function createIamenderMcp() {
 const app = express();
 app.use(express.json());
 const transports = new Map<string, StreamableHTTPServerTransport>();
+app.get("/health", (_request, response) => {
+  const config = loadConfig();
+  response.json({ ok: true, service: "iamender-tools", writeEnabled: config.allowWrite });
+});
 app.post("/mcp", async (request, response) => {
   try {
     const requestedId = request.headers["mcp-session-id"];
@@ -90,4 +94,8 @@ app.delete("/mcp", async (request, response) => {
   if (!transport) { response.status(400).send("Invalid or missing MCP session ID."); return; }
   await transport.handleRequest(request, response);
 });
-app.listen(port, "127.0.0.1", () => console.log(`IAMender MCP listening at http://127.0.0.1:${port}/mcp`));
+export function startMcpServer() {
+  return app.listen(port, "127.0.0.1", () => console.log(`IAMender MCP listening at http://127.0.0.1:${port}/mcp`));
+}
+
+if (process.argv[1]?.endsWith("mcp-server.ts")) startMcpServer();
